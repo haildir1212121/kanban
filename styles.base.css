@@ -92,10 +92,11 @@ html {
 
 body {
   display: grid;
-  place-content: center;
+  place-content: stretch;
 
   min-height: 100vh;
-  
+  overflow: hidden;
+
   background: var(--bg-backdrop);
   color: var(--fg-primary);
 }
