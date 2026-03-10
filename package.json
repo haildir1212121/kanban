@@ -1,0 +1,13 @@
+{
+  "name": "crayoncode",
+  "version": "1.0.0",
+  "description": "An app by crayoncode",
+  "scripts": {
+    "start": "npx serve"
+  },
+  "author": "crayoncode",
+  "license": "MIT",
+  "dependencies": {
+    "serve": "~14.0.0"
+  }
+}

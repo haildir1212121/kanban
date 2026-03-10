@@ -1,0 +1,158 @@
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* font-families */
+  --ff-default: 'Maven Pro', sans-serif;
+
+  /* foreground colors */
+  --fg-primary: #DFE8F7;
+  --fg-muted: #536582;
+  --fg-hi: #1D2024;
+
+  /* background colors */
+  --bg-backdrop: #25282C;
+  --bg-alt: #1D2024;
+  --bg-alt-rgb: 29, 32, 36;
+  --bg-default: #292D33;
+
+  --bg-filter: blur(20px);
+
+  /* highlights */
+  --hi-primary: #87BBFF;
+  --hi-primary-rgb: 135, 187, 255;
+
+  --hi-muted: #87BBFF;
+  --hi-muted-rgb: 135, 187, 255;
+  --hi-neutral: #0B67FD;
+  --hi-neutral-rgb: 11, 103, 253;
+  --hi-positive: #28B511;
+  --hi-positive-rgb: 40, 181, 17;
+  --hi-attention: #FF9900;
+  --hi-attention-rgb: 255, 153, 0;
+  --hi-negative: #FF006B;
+  --hi-negative-rgb: 255, 0, 107;
+
+  /* borders */
+  --bd-default: #3A404A;
+  --bd-muted: #292D33;
+  
+  --bd-radius-sm: 16px;
+  --bd-radius: 24px;
+  --bd-radius-lg: 32px;
+
+  /* spacings */
+  --sp-base: 16px;
+
+  --sp-sm-4: calc(0.125 * var(--sp-base));
+  --sp-sm-3: calc(0.25 * var(--sp-base));
+  --sp-sm-2: calc(0.5 * var(--sp-base));
+  --sp-sm-1: calc(0.75 * var(--sp-base));
+
+  --sp-lg-1: calc(1.25 * var(--sp-base));
+  --sp-lg-2: calc(1.5 * var(--sp-base));
+  --sp-lg-3: calc(1.75 * var(--sp-base));
+  --sp-lg-4: calc(2 * var(--sp-base));
+
+  /* font sizes */
+  --fs-base: 15px;
+  --fs-sm-1: 12px;
+  --fs-sm-2: 9.6px;
+  --fs-lg-1: 18.75px;
+  --fs-lg-2: 23.44px;
+  --fs-lg-3: 29.3px;
+
+  /* line heights */
+  --lh-base: 18.29px;
+  --lh-sm-1: 14.63px;
+  --lh-sm-2: 11.7px;
+  --lh-lg-1: 22.86px;
+  --lh-lg-2: 28.57px;
+  --lh-lg-3: 35.72px;
+
+  /* font-weights */
+  --fw-base: 400;
+  --fw-heavy-1: 500;
+
+  /* transitions */
+  --tr-default: 200ms ease-in-out;
+
+  /* elevations */
+  --el-default: 0px 22px 44px -33px #000000;
+}
+
+html {
+  font-size: var(--fs-base);
+  font-family: var(--ff-default);
+  letter-spacing: 0.03em;
+}
+
+body {
+  display: grid;
+  place-content: center;
+
+  min-height: 100vh;
+  
+  background: var(--bg-backdrop);
+  color: var(--fg-primary);
+}
+
+main {
+  position: relative;
+
+  display: grid;
+  place-content: stretch;
+  grid-template-rows: 1fr 9fr;
+  grid-template-columns: 
+    9fr 134fr 17fr;
+  grid-template-areas:
+    "nav header header"
+    "nav lanes targets";
+
+  aspect-ratio: 16 / 9;
+  width: 1280px;
+  border-radius: var(--bd-radius-lg);
+
+  background: var(--bg-graphic);
+}
+
+main::before {
+  content: '';
+
+  position: absolute;
+
+  aspect-ratio: 16 / 9;
+  width: 1032px;
+  left: 124px;
+  top: 126px;
+
+  background: var(--bg-graphic);
+  background-size: cover;
+
+  filter: blur(41px);
+  z-index: -1;
+}
+
+main > nav {
+  grid-area: nav;
+
+  background: var(--bg-alt);
+  border-top-left-radius: var(--bd-radius-lg);
+  border-bottom-left-radius:
+    var(--bd-radius-lg);
+}
+
+main > header {
+  grid-area: header;
+}
+
+main > .lanes {
+  grid-area: lanes;
+}
+
+main > .targets {
+  grid-area: targets;
+}

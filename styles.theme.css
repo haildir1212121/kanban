@@ -1,0 +1,24 @@
+.theme-coronary-dream {
+  --bg-graphic: url('./assets/bg-theme-coronary-dream.png');
+}
+
+.theme-liquid-crystal {
+  --bg-graphic: url('./assets/bg-theme-liquid-crystal.png');
+}
+
+.theme-path-finder {
+  --bg-graphic: url('./assets/bg-theme-path-finder.png');
+}
+
+.theme-chroma-file {
+  --bg-graphic: url('./assets/bg-theme-chroma-file.png');
+}
+
+.theme {
+  transition: var(--tr-default);
+  transition-property: fill;
+}
+
+.theme-active {
+  fill: rgba(var(--hi-primary-rgb), 0.5);
+}

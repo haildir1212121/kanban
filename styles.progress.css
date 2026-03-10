@@ -1,0 +1,38 @@
+.progress {
+  display: grid;
+  grid-auto-flow: row;
+  row-gap: calc(0.375 * var(--sp-base));
+}
+
+.progress__details {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+
+  list-style-type: none;
+}
+
+.progress__bar {
+  position: relative;
+  height: 5px;
+  border-radius: var(--bd-radius-sm);
+
+  background: var(--bg-alt);
+}
+
+.progress__bar::before {
+  content: '';
+
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: calc(var(--value) * 1%);
+  border-radius: var(--bd-radius-sm);
+
+  background: var(--hi-primary);
+
+  box-shadow:
+    0px 0px 6px 1px
+    rgba(var(--hi-primary-rgb), 0.25);
+}

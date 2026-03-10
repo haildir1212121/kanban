@@ -1,0 +1,15 @@
+.header {
+  column-gap: var(--sp-lg-2);
+  padding:
+    var(--sp-base)
+    var(--sp-lg-4);
+
+  background: rgba(var(--bg-alt-rgb), 0.8);
+  backdrop-filter: var(--bg-filter);
+  border-top-right-radius:
+    var(--bd-radius-lg);
+}
+
+.header .action {
+  padding: var(--sp-sm-2);
+}
