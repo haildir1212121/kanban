@@ -11,7 +11,7 @@ const firebaseConfig = {
   measurementId: "G-3XSEV0RBX0"
 };
 
-const COLLECTION = 'tickets';
+const COLLECTION = 'vehicles';
 
 const COLUMNS = [
   { id: 'incoming', title: 'Incoming', colorClass: 'col-incoming' },
@@ -45,6 +45,11 @@ let draggedElement = null;
 function initFirebase() {
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
+
+  // Sign in anonymously so authenticated rules also work
+  firebase.auth().signInAnonymously().catch(err => {
+    console.warn('Anonymous auth failed (open rules will still work):', err.message);
+  });
 }
 
 function subscribeToTickets() {
