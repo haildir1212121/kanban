@@ -1,5 +1,17 @@
 // Fleet Repair Tracking System
-// Columns, ticketing, drag-and-drop, and localStorage persistence
+// Firebase Firestore backend with real-time sync
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCnH_ILuDyJB1mC0iBlrfYIAFVumD74yo4",
+  authDomain: "dlx-dmt-tracker.firebaseapp.com",
+  projectId: "dlx-dmt-tracker",
+  storageBucket: "dlx-dmt-tracker.firebasestorage.app",
+  messagingSenderId: "958627003202",
+  appId: "1:958627003202:web:07ea8476831ef49e4ea6db",
+  measurementId: "G-3XSEV0RBX0"
+};
+
+const COLLECTION = 'tickets';
 
 const COLUMNS = [
   { id: 'incoming', title: 'Incoming', colorClass: 'col-incoming' },
@@ -23,34 +35,54 @@ const REPAIR_TYPE_LABELS = {
   'other': 'Other',
 };
 
-const STORAGE_KEY = 'fleet-repair-tickets';
-
+let db = null;
 let tickets = [];
 let draggedTicketId = null;
 let draggedElement = null;
 
-// ── Persistence ──────────────────────────────
+// ── Firebase ─────────────────────────────────
 
-function loadTickets() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      tickets = JSON.parse(stored);
-    } else {
-      tickets = getSampleTickets();
-      saveTickets();
-    }
-  } catch {
-    tickets = getSampleTickets();
+function initFirebase() {
+  firebase.initializeApp(firebaseConfig);
+  db = firebase.firestore();
+}
+
+function subscribeToTickets() {
+  db.collection(COLLECTION)
+    .orderBy('createdAt', 'desc')
+    .onSnapshot((snapshot) => {
+      tickets = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      renderBoard();
+    }, (error) => {
+      console.error('Firestore subscription error:', error);
+    });
+}
+
+async function saveTicket(ticket) {
+  const { id, ...data } = ticket;
+  if (id && await docExists(id)) {
+    await db.collection(COLLECTION).doc(id).update(data);
+  } else {
+    const ref = await db.collection(COLLECTION).add(data);
+    return ref.id;
   }
+  return id;
 }
 
-function saveTickets() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
+async function deleteTicket(id) {
+  await db.collection(COLLECTION).doc(id).delete();
 }
 
-function generateId() {
-  return 'TK-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 5).toUpperCase();
+async function updateTicketColumn(id, column, extras = {}) {
+  await db.collection(COLLECTION).doc(id).update({ column, ...extras });
+}
+
+async function docExists(id) {
+  const doc = await db.collection(COLLECTION).doc(id).get();
+  return doc.exists;
 }
 
 // ── Rendering ────────────────────────────────
@@ -100,16 +132,17 @@ function createTicketCard(ticket) {
   const card = document.createElement('div');
   card.className = 'ticket-card';
   card.dataset.id = ticket.id;
-  card.dataset.priority = ticket.priority;
+  card.dataset.priority = ticket.priority || 'medium';
   card.draggable = true;
 
-  const priorityLabel = ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1);
-  const repairLabel = REPAIR_TYPE_LABELS[ticket.repairType] || ticket.repairType;
+  const priority = ticket.priority || 'medium';
+  const priorityLabel = priority.charAt(0).toUpperCase() + priority.slice(1);
+  const repairLabel = REPAIR_TYPE_LABELS[ticket.repairType] || ticket.repairType || 'Other';
   const timeAgo = getTimeAgo(ticket.createdAt);
 
   card.innerHTML = `
     <div class="ticket-card__header">
-      <div class="ticket-card__vehicle-number">#${escapeHtml(ticket.vehicleNumber)}</div>
+      <div class="ticket-card__vehicle-number">#${escapeHtml(ticket.vehicleNumber || '')}</div>
       <button class="ticket-card__edit" title="Edit ticket">
         <svg width="16" height="16" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M227.31 73.37l-44.68-44.69a16 16 0 00-22.63 0L36.69 152A15.86 15.86 0 0032 163.31V208a16 16 0 0016 16h44.69a15.86 15.86 0 0011.31-4.69L227.31 96a16 16 0 000-22.63zM192 108.68L147.31 64 168 43.31 212.69 88z" fill="currentColor"/>
@@ -121,23 +154,21 @@ function createTicketCard(ticket) {
       ${ticket.description ? `<div class="ticket-card__description">${escapeHtml(ticket.description)}</div>` : ''}
       <div class="ticket-card__meta">
         <span class="ticket-card__badge badge--repair-type">${repairLabel}</span>
-        <span class="ticket-card__badge badge--priority-${ticket.priority}">${priorityLabel}</span>
+        <span class="ticket-card__badge badge--priority-${priority}">${priorityLabel}</span>
       </div>
     </div>
     <div class="ticket-card__footer">
       <span class="ticket-card__assignee">${ticket.assignee ? escapeHtml(ticket.assignee) : 'Unassigned'}</span>
       <span class="ticket-card__time">${ticket.estimatedHours ? ticket.estimatedHours + 'h est' : ''}${ticket.mileage ? ' · ' + escapeHtml(ticket.mileage) + ' mi' : ''}</span>
     </div>
-    <div class="ticket-card__ticket-id">${ticket.id} · ${timeAgo}</div>
+    <div class="ticket-card__ticket-id">${ticket.id.substring(0, 8)} · ${timeAgo}</div>
   `;
 
-  // Edit button handler
   card.querySelector('.ticket-card__edit').addEventListener('click', (e) => {
     e.stopPropagation();
     openEditModal(ticket.id);
   });
 
-  // Drag handlers
   card.addEventListener('dragstart', (e) => {
     draggedTicketId = ticket.id;
     draggedElement = card;
@@ -167,7 +198,6 @@ function setupDropZone(container) {
     const column = container.closest('.fleet-column');
     column.classList.add('drag-over');
 
-    // Show drop placeholder
     const afterElement = getDragAfterElement(container, e.clientY);
     let placeholder = container.querySelector('.drop-placeholder');
 
@@ -182,13 +212,11 @@ function setupDropZone(container) {
       container.appendChild(placeholder);
     }
 
-    // Remove empty state
     const emptyEl = container.querySelector('.fleet-column__empty');
     if (emptyEl) emptyEl.remove();
   });
 
   container.addEventListener('dragleave', (e) => {
-    // Only handle if we're actually leaving the container
     if (!container.contains(e.relatedTarget)) {
       const column = container.closest('.fleet-column');
       column.classList.remove('drag-over');
@@ -210,29 +238,19 @@ function setupDropZone(container) {
 
     if (!ticketId || !newColumn) return;
 
-    // Find the ticket and determine new position
     const ticket = tickets.find(t => t.id === ticketId);
     if (!ticket) return;
 
     const oldColumn = ticket.column;
-    ticket.column = newColumn;
-
-    // Determine insert position based on where dropped
-    const afterElement = getDragAfterElement(container, e.clientY);
-    const columnTickets = tickets.filter(t => t.column === newColumn && t.id !== ticketId);
-
-    if (afterElement) {
-      const afterId = afterElement.dataset.id;
-      const afterIndex = columnTickets.findIndex(t => t.id === afterId);
-      // We don't need exact ordering for now since we sort by priority
-    }
+    const extras = {};
 
     if (newColumn === 'completed' && oldColumn !== 'completed') {
-      ticket.completedAt = new Date().toISOString();
+      extras.completedAt = new Date().toISOString();
     }
 
-    saveTickets();
-    renderBoard();
+    updateTicketColumn(ticketId, newColumn, extras).catch(err => {
+      console.error('Failed to update ticket column:', err);
+    });
   });
 }
 
@@ -262,15 +280,15 @@ function openModal(ticket = null) {
     title.textContent = 'Edit Repair Ticket';
     deleteBtn.style.display = 'block';
     document.getElementById('ticket-id').value = ticket.id;
-    document.getElementById('vehicle-number').value = ticket.vehicleNumber;
+    document.getElementById('vehicle-number').value = ticket.vehicleNumber || '';
     document.getElementById('vehicle-name').value = ticket.vehicleName || '';
-    document.getElementById('ticket-priority').value = ticket.priority;
+    document.getElementById('ticket-priority').value = ticket.priority || 'medium';
     document.getElementById('ticket-assignee').value = ticket.assignee || '';
     document.getElementById('repair-type').value = ticket.repairType || 'other';
     document.getElementById('ticket-description').value = ticket.description || '';
     document.getElementById('estimated-hours').value = ticket.estimatedHours || '';
     document.getElementById('mileage').value = ticket.mileage || '';
-    document.getElementById('ticket-column').value = ticket.column;
+    document.getElementById('ticket-column').value = ticket.column || 'incoming';
   } else {
     title.textContent = 'New Repair Ticket';
     deleteBtn.style.display = 'none';
@@ -291,7 +309,7 @@ function closeModal() {
   document.getElementById('modal-overlay').classList.remove('active');
 }
 
-function handleFormSubmit(e) {
+async function handleFormSubmit(e) {
   e.preventDefault();
   const form = document.getElementById('ticket-form');
   const formData = new FormData(form);
@@ -301,50 +319,46 @@ function handleFormSubmit(e) {
 
   if (!vehicleNumber) return;
 
-  if (id) {
-    // Edit existing
-    const ticket = tickets.find(t => t.id === id);
-    if (ticket) {
-      ticket.vehicleNumber = vehicleNumber;
-      ticket.vehicleName = formData.get('vehicleName').trim();
-      ticket.priority = formData.get('priority');
-      ticket.assignee = formData.get('assignee').trim();
-      ticket.repairType = formData.get('repairType');
-      ticket.description = formData.get('description').trim();
-      ticket.estimatedHours = parseFloat(formData.get('estimatedHours')) || 0;
-      ticket.mileage = formData.get('mileage').trim();
-    }
-  } else {
-    // New ticket
-    const newTicket = {
-      id: generateId(),
-      vehicleNumber,
-      vehicleName: formData.get('vehicleName').trim(),
-      priority: formData.get('priority'),
-      assignee: formData.get('assignee').trim(),
-      repairType: formData.get('repairType'),
-      description: formData.get('description').trim(),
-      estimatedHours: parseFloat(formData.get('estimatedHours')) || 0,
-      mileage: formData.get('mileage').trim(),
-      column: 'incoming',
-      createdAt: new Date().toISOString(),
-      completedAt: null,
-    };
-    tickets.push(newTicket);
-  }
+  const ticketData = {
+    vehicleNumber,
+    vehicleName: formData.get('vehicleName').trim(),
+    priority: formData.get('priority'),
+    assignee: formData.get('assignee').trim(),
+    repairType: formData.get('repairType'),
+    description: formData.get('description').trim(),
+    estimatedHours: parseFloat(formData.get('estimatedHours')) || 0,
+    mileage: formData.get('mileage').trim(),
+  };
 
-  saveTickets();
-  renderBoard();
-  closeModal();
+  try {
+    if (id) {
+      // Update existing ticket
+      await db.collection(COLLECTION).doc(id).update(ticketData);
+    } else {
+      // Create new ticket
+      ticketData.column = 'incoming';
+      ticketData.createdAt = new Date().toISOString();
+      ticketData.completedAt = null;
+      await db.collection(COLLECTION).add(ticketData);
+    }
+    closeModal();
+  } catch (err) {
+    console.error('Failed to save ticket:', err);
+    alert('Failed to save ticket. Check console for details.');
+  }
 }
 
-function handleDelete() {
+async function handleDelete() {
   const id = document.getElementById('ticket-id').value;
   if (!id) return;
-  tickets = tickets.filter(t => t.id !== id);
-  saveTickets();
-  renderBoard();
-  closeModal();
+
+  try {
+    await deleteTicket(id);
+    closeModal();
+  } catch (err) {
+    console.error('Failed to delete ticket:', err);
+    alert('Failed to delete ticket. Check console for details.');
+  }
 }
 
 // ── Stats ────────────────────────────────────
@@ -396,179 +410,22 @@ function getTimeAgo(dateStr) {
   return diffDays + 'd ago';
 }
 
-// ── Sample Data ──────────────────────────────
-
-function getSampleTickets() {
-  const now = new Date();
-  return [
-    {
-      id: 'TK-001',
-      vehicleNumber: '4501',
-      vehicleName: '2019 Freightliner Cascadia',
-      priority: 'urgent',
-      assignee: 'Mike S.',
-      repairType: 'engine',
-      description: 'Engine overheating under load. Coolant leak suspected near thermostat housing.',
-      estimatedHours: 6,
-      mileage: '342,100',
-      column: 'in-repair',
-      createdAt: new Date(now - 2 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-002',
-      vehicleNumber: '2287',
-      vehicleName: '2021 Peterbilt 579',
-      priority: 'high',
-      assignee: 'Dave R.',
-      repairType: 'brakes',
-      description: 'Front brake pads worn below minimum. Rotors need inspection.',
-      estimatedHours: 4,
-      mileage: '198,500',
-      column: 'in-repair',
-      createdAt: new Date(now - 5 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-003',
-      vehicleNumber: '7733',
-      vehicleName: '2020 Kenworth T680',
-      priority: 'medium',
-      assignee: '',
-      repairType: 'electrical',
-      description: 'Intermittent no-start condition. Battery tested good, suspect starter relay.',
-      estimatedHours: 3,
-      mileage: '275,000',
-      column: 'incoming',
-      createdAt: new Date(now - 1 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-004',
-      vehicleNumber: '1190',
-      vehicleName: '2018 Volvo VNL 860',
-      priority: 'high',
-      assignee: 'Tony M.',
-      repairType: 'transmission',
-      description: 'Hard shifting between 3rd and 4th gear. Transmission fluid is dark.',
-      estimatedHours: 8,
-      mileage: '410,200',
-      column: 'waiting-parts',
-      createdAt: new Date(now - 24 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-005',
-      vehicleNumber: '5560',
-      vehicleName: '2022 International LT',
-      priority: 'low',
-      assignee: 'Mike S.',
-      repairType: 'oil-change',
-      description: 'Regular PM service. Oil change, filter replacement, and multi-point inspection.',
-      estimatedHours: 2,
-      mileage: '89,300',
-      column: 'incoming',
-      createdAt: new Date(now - 3 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-006',
-      vehicleNumber: '3345',
-      vehicleName: '2017 Mack Anthem',
-      priority: 'medium',
-      assignee: 'Dave R.',
-      repairType: 'hvac',
-      description: 'A/C not blowing cold. Compressor clutch not engaging.',
-      estimatedHours: 4,
-      mileage: '520,100',
-      column: 'diagnosing',
-      createdAt: new Date(now - 8 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-007',
-      vehicleNumber: '8821',
-      vehicleName: '2020 Freightliner M2 106',
-      priority: 'urgent',
-      assignee: 'Tony M.',
-      repairType: 'tires',
-      description: 'Blowout on rear driver side dual. Both tires need replacement. Rim damage check required.',
-      estimatedHours: 3,
-      mileage: '156,700',
-      column: 'waiting-parts',
-      createdAt: new Date(now - 4 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-008',
-      vehicleNumber: '6102',
-      vehicleName: '2019 Kenworth W990',
-      priority: 'low',
-      assignee: 'Mike S.',
-      repairType: 'inspection',
-      description: 'Annual DOT inspection due. Schedule for full safety inspection.',
-      estimatedHours: 3,
-      mileage: '301,400',
-      column: 'incoming',
-      createdAt: new Date(now - 12 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-009',
-      vehicleNumber: '9944',
-      vehicleName: '2021 Volvo VNR 640',
-      priority: 'medium',
-      assignee: 'Dave R.',
-      repairType: 'suspension',
-      description: 'Driver reports rough ride. Possible air bag leak on rear suspension.',
-      estimatedHours: 5,
-      mileage: '167,800',
-      column: 'diagnosing',
-      createdAt: new Date(now - 6 * 3600000).toISOString(),
-      completedAt: null,
-    },
-    {
-      id: 'TK-010',
-      vehicleNumber: '4120',
-      vehicleName: '2018 Peterbilt 389',
-      priority: 'low',
-      assignee: 'Tony M.',
-      repairType: 'body',
-      description: 'Minor fender damage from dock contact. Cosmetic repair needed.',
-      estimatedHours: 6,
-      mileage: '445,000',
-      column: 'completed',
-      createdAt: new Date(now - 48 * 3600000).toISOString(),
-      completedAt: new Date(now - 2 * 3600000).toISOString(),
-    },
-  ];
-}
-
 // ── Init ─────────────────────────────────────
 
 function init() {
-  loadTickets();
-  renderBoard();
+  initFirebase();
+  subscribeToTickets();
   updateClock();
   setInterval(updateClock, 30000);
 
-  // New ticket button
   document.getElementById('add-ticket-btn').addEventListener('click', () => openModal());
-
-  // Modal close/cancel
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.getElementById('modal-cancel').addEventListener('click', closeModal);
   document.getElementById('modal-overlay').addEventListener('click', (e) => {
     if (e.target === e.currentTarget) closeModal();
   });
-
-  // Form submit
   document.getElementById('ticket-form').addEventListener('submit', handleFormSubmit);
-
-  // Delete button
   document.getElementById('modal-delete').addEventListener('click', handleDelete);
-
-  // Close modal on Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeModal();
   });
