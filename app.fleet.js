@@ -45,11 +45,6 @@ let draggedElement = null;
 function initFirebase() {
   firebase.initializeApp(firebaseConfig);
   db = firebase.firestore();
-
-  // Sign in anonymously so authenticated rules also work
-  firebase.auth().signInAnonymously().catch(err => {
-    console.warn('Anonymous auth failed (open rules will still work):', err.message);
-  });
 }
 
 function subscribeToTickets() {
